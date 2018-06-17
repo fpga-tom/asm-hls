@@ -1,2 +1,3 @@
 # asm-hls
-HLS compiler to Verilog
+PoC HLS compiler to Verilog. Input is code written in micro-assembly language.
+ 
