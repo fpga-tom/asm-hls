@@ -1,3 +1,7 @@
+import ply.lex as lex
+import re
+import ply.yacc as yacc
+
 reserved = {
     'alias' : 'ALIAS',
     'macro' : 'MACRO',
@@ -10,10 +14,9 @@ reserved = {
     'add' : "ADD",
 }
 
-tokens = [ 'REG', 'NUMBER', 'COMMA', 'ID', 'EQ',  'NEWLINE', 'COLON', 'LEFT', 'RIGHT' ] \
+tokens = [ 'REG', 'NUMBER', 'COMMA', 'ID', 'EQ', 'COLON', 'LEFT', 'RIGHT', 'NEWLINE'] \
          + list(reserved.values())
 
-t_REG = r'r[0-9]+'
 t_NUMBER = r'[0-9]+'
 t_COMMA = r','
 t_EQ = r'='
@@ -24,31 +27,6 @@ t_RIGHT = r'\]'
 
 t_ignore = ' \t'
 
-import ply.lex as lex
-lex.lex()
-
-def t_ID(t):
-    r'[a-zA-Z_][a-zA-Z_0-9]*'
-    t.type = reserved.get(t.value,'ID')    # Check for reserved words
-    return t
-
-def p_opcode(t):
-    '''opcode : INC
-     | MOV
-     | SET
-     | CLR
-     | JMP
-     | JE
-     | ADD'''
-
-def t_COMMENT(t):
-    r'\#.*'
-    pass
-    # No return value. Token discarded
-
-
-
-
 def p_unit(p):
     '''unit : statement
             | unit statement'''
@@ -57,20 +35,43 @@ def p_unit(p):
     else:
         p[0] = p[1] + [p[2]]
 
+def p_statement(p):
+    '''statement : alias
+        | macro
+        | instruction_list'''
+    p[0] = p[1]
+
+def p_alias(p):
+    '''alias : ALIAS ID EQ reg_range'''
+    p[0] = (p[2], p[4])
+
+def p_macro(p):
+    '''macro : MACRO ID COLON instruction_list NEWLINE'''
+
+def p_instruction(p):
+    '''instruction : opcode reg_list'''
+    p[0] = (p[1], p[2])
+
+def p_instruction_list(p):
+    '''instruction_list : instruction
+        | instruction_list instruction'''
+
 def p_range_1(p):
     '''range : LEFT NUMBER COLON NUMBER RIGHT'''
+    p[0] = (p[2], p[4])
 
 def p_range_2(p):
     '''range : LEFT NUMBER RIGHT'''
+    p[0] = p[2]
 
 def p_reg(p):
     '''reg : REG
         | ID'''
-    p[0] = [p[1]]
+    p[0] = p[1]
 
 def p_reg_range(p):
     '''reg_range : reg range'''
-    p[0] = [p[1]]
+    p[0] = p[1]
 
 def p_reg_list_1(p):
     '''reg_list : reg_range'''
@@ -80,36 +81,41 @@ def p_reg_list_2(p):
     '''reg_list : reg_list COMMA reg_range'''
     p[0] = p[1] + [p[3]]
 
-def p_alias(p):
-    '''alias : ALIAS ID EQ reg_range'''
+def p_opcode(p):
+    '''opcode : INC
+     | MOV
+     | SET
+     | CLR
+     | JMP
+     | JE
+     | ADD'''
+    p[0] = ('opcode', p[1])
 
-def p_macro(p):
-    '''macro : MACRO ID COLON NEWLINE instruction_list NEWLINE'''
+def t_ID(t):
+    r'[a-zA-Z_][a-zA-Z_0-9]*'
+    if re.match('r[0-9]+', t.value):
+        t.type = 'REG'
+    else:
+        t.type = reserved.get(t.value,'ID')    # Check for reserved words
+    return t
 
-def p_instruction(p):
-    '''instruction : opcode reg_list'''
-    p[0] = (p[1], p[2])
+def t_COMMENT(t):
+    r'\#.*'
+    pass
+    # No return value. Token discarded
 
-def p_instruction_list(p):
-    '''instruction_list : instruction
-        | instruction instruction_list'''
-
-def p_statement(p):
-    '''statement : alias
-        | macro
-        | instruction_list'''
-
-
-
+def t_newline(t):
+    r'\n+'
+    t.lexer.lineno += len(t.value)
 
 
-import ply.yacc as yacc
-yacc.yacc()
+lex.lex()
+parser = yacc.yacc()
 
 import networkx as nx
 import sys
 f = open("a.asm")
-comp_unit = yacc.parse(f.read())
+comp_unit = parser.parse(f.read())
 f.close()
 print(comp_unit)
 
