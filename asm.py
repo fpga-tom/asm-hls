@@ -4,82 +4,109 @@ import ply.yacc as yacc
 
 reserved = {
     'alias' : 'ALIAS',
-    'macro' : 'MACRO',
+    'macro' : 'MACRO_DEF',
     'inc' : 'INC',
     'mov' : 'MOV',
     'set' : 'SET',
     'clr' : 'CLR',
-    'jmp' : "JMP",
-    'je' : "JE",
-    'add' : "ADD",
+    'jmp' : 'JMP',
+    'je' : 'JE',
+    'jne' : 'JNE',
+    'add' : 'ADD',
+    'and' : 'AND'
 }
 
-tokens = [ 'REG', 'NUMBER', 'COMMA', 'ID', 'EQ', 'COLON', 'LEFT', 'RIGHT', 'NEWLINE'] \
+tokens = [ 'REG', 'MACRO', 'LABEL', 'COMMENT', 'NUMBER', 'COMMA', 'ID', 'EQ', 'COLON', 'LEFT', 'RIGHT', 'NEWLINE'] \
          + list(reserved.values())
 
-t_NUMBER = r'[0-9]+'
+t_NUMBER = r'[0-9A-F]+'
 t_COMMA = r','
 t_EQ = r'='
 t_COLON = r':'
-t_NEWLINE = r'\n'
 t_LEFT = r'\['
 t_RIGHT = r'\]'
 
 t_ignore = ' \t'
 
+alias = []
+macro = []
+label = []
+
 def p_unit(p):
-    '''unit : statement
-            | unit statement'''
+    '''unit : statement NEWLINE
+            | unit statement NEWLINE'''
     if len(p) == 2:
-        p[0] = [p[1]]
+        p[0] = ('unit', p[1])
     else:
-        p[0] = p[1] + [p[2]]
+        p[0] = ('unit', p[1], p[2])
+
+def t_NEWLINE(t):
+    r'\n'
+    t.lexer.lineno += len(t.value)
+    return t
 
 def p_statement(p):
     '''statement : alias
-        | macro
+        | macro_def
+        | label_def
+        | COMMENT
+        | MACRO
         | instruction_list'''
-    p[0] = p[1]
+    p[0] = ('statement', p[1])
 
 def p_alias(p):
     '''alias : ALIAS ID EQ reg_range'''
-    p[0] = (p[2], p[4])
+    global alias
+    p[0] = ('alias', p[2], p[4])
+    alias += [p[2]]
 
-def p_macro(p):
-    '''macro : MACRO ID COLON instruction_list NEWLINE'''
+def p_macro_def(p):
+    '''macro_def : MACRO_DEF ID NEWLINE unit'''
+    global macro
+    p[0] = ('macro', p[2], p[4])
+    macro += [p[2]]
+    print(macro)
+
 
 def p_instruction(p):
-    '''instruction : opcode reg_list'''
-    p[0] = (p[1], p[2])
+    '''instruction : opcode arg_list'''
+    # p[0] = ('instruction', p[1], p[2])
 
 def p_instruction_list(p):
     '''instruction_list : instruction
         | instruction_list instruction'''
+    if len(p) == 2:
+        p[0] = ('instruction_list', p[1])
+    else:
+        p[0] = ('instruction_list', p[1], p[2])
 
 def p_range_1(p):
     '''range : LEFT NUMBER COLON NUMBER RIGHT'''
-    p[0] = (p[2], p[4])
+    p[0] = ('range', p[2], p[4])
 
 def p_range_2(p):
     '''range : LEFT NUMBER RIGHT'''
-    p[0] = p[2]
+    p[0] = ('range', p[2])
 
 def p_reg(p):
-    '''reg : REG
-        | ID'''
-    p[0] = p[1]
+    '''reg : REG'''
+    p[0] = ('reg', p[1])
 
 def p_reg_range(p):
-    '''reg_range : reg range'''
-    p[0] = p[1]
+    '''reg_range : reg
+        | reg range'''
+    if len(p) == 3:
+        p[0] = ('reg_range', p[1], p[2])
 
-def p_reg_list_1(p):
-    '''reg_list : reg_range'''
-    p[0] = [p[1]]
+def p_arg(p):
+    '''arg : ID
+        | LABEL
+        | NUMBER
+        | reg_range'''
 
-def p_reg_list_2(p):
-    '''reg_list : reg_list COMMA reg_range'''
-    p[0] = p[1] + [p[3]]
+def p_arg_list(p):
+    '''arg_list : arg
+        | arg_list COMMA arg'''
 
 def p_opcode(p):
     '''opcode : INC
@@ -88,25 +115,39 @@ def p_opcode(p):
      | CLR
      | JMP
      | JE
-     | ADD'''
+     | JNE
+     | ADD
+     | AND'''
     p[0] = ('opcode', p[1])
+
+def p_label(p):
+    '''label_def : ID COLON'''
+    p[0] = ('label', p[1])
+    global label
+    label += [p[1]]
 
 def t_ID(t):
     r'[a-zA-Z_][a-zA-Z_0-9]*'
-    if re.match('r[0-9]+', t.value):
+    global alias
+    if re.match('r[0-9]+', t.value) or t.value in alias:
         t.type = 'REG'
+    elif t.value in macro:
+        t.type = 'MACRO'
+    elif t.value in label:
+        t.type = 'LABEL'
     else:
         t.type = reserved.get(t.value,'ID')    # Check for reserved words
     return t
 
 def t_COMMENT(t):
     r'\#.*'
-    pass
-    # No return value. Token discarded
+    return t
 
-def t_newline(t):
-    r'\n+'
-    t.lexer.lineno += len(t.value)
+
+
+def t_error(t):
+    print("Illegal character '%s'" % t.value[0])
+    t.lexer.skip(1)
 
 
 lex.lex()
