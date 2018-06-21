@@ -51,6 +51,13 @@ i_fetch:
 inc_pc:
     inc pc
     jmp i_fetch
+i_decode:
+    je ir, 69, op_adc_69_imm
+    je ir, 29, op_and_29_imm
+    je ir, 0A, op_asl_0A_acc
+    je ir, 4C, op_jmp_4C_abs
+    je ir, 6C, op_jmp_6C_ind
+    jmp op_undefined
 op_undefined:
 #    TODO: what does 6502 do, when encountering undefined opcode?
     jmp inc_pc
@@ -77,10 +84,3 @@ op_jmp_6C_ind:
     mov pc[7:0], ll
     mov pc[15:8], hh
     jmp i_fetch
-i_decode:
-    je ir, 69, op_adc_69_imm
-    je ir, 29, op_and_29_imm
-    je ir, 0A, op_asl_0A_acc
-    je ir, 4C, op_jmp_4C_abs
-    je ir, 6C, op_jmp_6C_ind
-    jmp op_undefined

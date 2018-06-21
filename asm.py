@@ -28,17 +28,17 @@ t_RIGHT = r'\]'
 
 t_ignore = ' \t'
 
-alias = []
-macro = []
-label = []
+alias = set()
+macro = set()
+label = set()
 
 def p_unit(p):
     '''unit : statement NEWLINE
             | unit statement NEWLINE'''
-    if len(p) == 2:
-        p[0] = ('unit', p[1])
+    if len(p) == 3:
+        p[0] = ('unit', [p[1]])
     else:
-        p[0] = ('unit', p[1], p[2])
+        p[0] = ('unit', p[1][1] + [p[2]])
 
 def t_NEWLINE(t):
     r'\n'
@@ -49,36 +49,43 @@ def p_statement(p):
     '''statement : alias
         | macro_def
         | label_def
-        | COMMENT
-        | MACRO
+        | comment
+        | macro
         | instruction_list'''
     p[0] = ('statement', p[1])
+
+def p_macro(p):
+    '''macro : MACRO'''
+    p[0] = ('macro', p[1])
+
+def p_comment(p):
+    '''comment : COMMENT'''
+    p[0] = ('comment', p[1])
 
 def p_alias(p):
     '''alias : ALIAS ID EQ reg_range'''
     global alias
     p[0] = ('alias', p[2], p[4])
-    alias += [p[2]]
+    alias.add(p[2])
 
 def p_macro_def(p):
     '''macro_def : MACRO_DEF ID NEWLINE unit'''
     global macro
     p[0] = ('macro', p[2], p[4])
-    macro += [p[2]]
-    print(macro)
+    macro.add(p[2])
 
 
 def p_instruction(p):
     '''instruction : opcode arg_list'''
-    # p[0] = ('instruction', p[1], p[2])
+    p[0] = ('instruction', p[1], p[2])
 
 def p_instruction_list(p):
     '''instruction_list : instruction
         | instruction_list instruction'''
     if len(p) == 2:
-        p[0] = ('instruction_list', p[1])
+        p[0] = ('instruction_list', [p[1]])
     else:
-        p[0] = ('instruction_list', p[1], p[2])
+        p[0] = ('instruction_list', p[1][1] + [p[2]])
 
 def p_range_1(p):
     '''range : LEFT NUMBER COLON NUMBER RIGHT'''
@@ -86,27 +93,38 @@ def p_range_1(p):
 
 def p_range_2(p):
     '''range : LEFT NUMBER RIGHT'''
-    p[0] = ('range', p[2])
+    p[0] = ('range', p[2], p[2])
 
 def p_reg(p):
     '''reg : REG'''
     p[0] = ('reg', p[1])
 
 def p_reg_range(p):
-    '''reg_range : reg
-        | reg range'''
-    if len(p) == 3:
-        p[0] = ('reg_range', p[1], p[2])
+    '''reg_range : reg range'''
+    p[0] = ('reg_range', p[1], p[2])
+
+def p_label(p):
+    '''label : LABEL'''
+    p[0] = ('label', p[1])
+
+def p_number(p):
+    '''number : NUMBER'''
+    p[0] = ('number', p[1])
 
 def p_arg(p):
-    '''arg : ID
-        | LABEL
-        | NUMBER
-        | reg_range'''
+    '''arg : label
+        | number
+        | reg_range
+        | reg'''
+    p[0] = ('arg', p[1])
 
 def p_arg_list(p):
     '''arg_list : arg
         | arg_list COMMA arg'''
+    if len(p) == 2:
+        p[0] = ('arg_list', [p[1]])
+    else:
+        p[0] = ('arg_list', p[1][1] + [p[3]])
 
 def p_opcode(p):
     '''opcode : INC
@@ -120,11 +138,9 @@ def p_opcode(p):
      | AND'''
     p[0] = ('opcode', p[1])
 
-def p_label(p):
-    '''label_def : ID COLON'''
-    p[0] = ('label', p[1])
-    global label
-    label += [p[1]]
+def p_label_def(p):
+    '''label_def : LABEL COLON'''
+    p[0] = ('label_def', p[1])
 
 def t_ID(t):
     r'[a-zA-Z_][a-zA-Z_0-9]*'
@@ -143,33 +159,102 @@ def t_COMMENT(t):
     r'\#.*'
     return t
 
-
-
 def t_error(t):
     print("Illegal character '%s'" % t.value[0])
     t.lexer.skip(1)
 
 
-lex.lex()
-parser = yacc.yacc()
+class NodeVisitor(object):
+    def visit(self, node):
+        method_name = 'visit_' + node[0]
+        visitor = getattr(self, method_name, self.generic_visit)
+        return visitor(node)
+
+    def generic_visit(self, node):
+        raise Exception('No visit_{} method'.format(node[0]))
+
+class AsmGenericVisitor(NodeVisitor):
+    def visit_unit(self, node):
+        for statement in node[1]:
+            self.visit(statement)
+
+    def visit_statement(self, node):
+        self.visit(node[1])
+
+    def visit_alias(self, node):
+        self.visit(node[2])
+
+    def visit_reg_range(self, node):
+        self.visit(node[1])
+        self.visit(node[2])
+
+    def visit_reg(self, node):
+        pass
+
+    def visit_range(self, node):
+        pass
+
+    def visit_comment(self, node):
+        pass
+
+    def visit_macro(self, node):
+        pass
+
+    def visit_label(self, node):
+        pass
+
+    def visit_label_def(self, node):
+        pass
+
+    def visit_instruction_list(self, node):
+        for instruction in node[1]:
+            self.visit(instruction)
+
+    def visit_instruction(self, node):
+        self.visit(node[1])
+        self.visit(node[2])
+
+    def visit_opcode(self, node):
+        pass
+
+    def visit_arg_list(self, node):
+        for arg in node[1]:
+            self.visit(arg)
+
+    def visit_arg(self, node):
+        self.visit(node[1])
+
+    def visit_number(self, node):
+        pass
+
+
+class AsmVisitor(AsmGenericVisitor):
+    pass
+
+
+
 
 import networkx as nx
 import sys
+f = open("a.asm")
+for line in f:
+    if re.match(r'[a-zA-Z_][a-zA-Z_0-9]*:', line):
+        label.add(line[:-2])
+f.close()
+print(label)
+
+lexer = lex.lex()
+parser = yacc.yacc()
+
 f = open("a.asm")
 comp_unit = parser.parse(f.read())
 f.close()
 print(comp_unit)
 
+asmVisitor = AsmGenericVisitor()
+asmVisitor.visit(comp_unit)
 
-class NodeVisitor(object):
-    def visit(self, node):
-        method_name = 'visit_' + type(node).__name__
-        visitor = getattr(self, method_name, self.generic_visit)
-        return visitor(node)
-
-    def generic_visit(self, node):
-        raise Exception('No visit_{} method'.format(type(node).__name__))
-
+exit(0)
 
 def _reg_list(i):
     return i[1]
