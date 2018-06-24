@@ -113,6 +113,7 @@ class CFGVisitor(AsmGenericVisitor):
     def visit_label(self, node, scope):
         scope['_label'] = node
 
+
 def construct_cfg(scope):
     # assign label to each instruction
     # assign id to each label

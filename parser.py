@@ -16,10 +16,7 @@ import ply.yacc as yacc
 reserved = {
     'alias' : 'ALIAS',
     'macro' : 'MACRO_DEF',
-    'inc' : 'INC',
     'mov' : 'MOV',
-    'set' : 'SET',
-    'clr' : 'CLR',
     'jmp' : 'JMP',
     'je' : 'JE',
     'jne' : 'JNE',
@@ -66,7 +63,7 @@ def p_statement(p):
         | label_def
         | comment
         | macro
-        | instruction_list'''
+        | instruction'''
     global node_count
     p[0] = ('statement', p[1], node_count)
     node_count += 1
@@ -172,10 +169,7 @@ def p_arg_list(p):
     node_count += 1
 
 def p_opcode(p):
-    '''opcode : INC
-     | MOV
-     | SET
-     | CLR
+    '''opcode : MOV
      | JMP
      | JE
      | JNE

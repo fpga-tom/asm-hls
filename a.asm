@@ -15,17 +15,17 @@ alias ll = r100[7:0]
 alias hh = r101[7:0]
 ###################################
 macro d_read
-    set rd
+    mov rd, 1
 l0:
     jne dr, 1, l0
-    clr rd
+    mov rd, 0
 
 macro pc_read
     mov mar, pc
     d_read
 
 macro pc_read_inc
-    inc pc
+    add pc, pc, 1
     pc_read
 
 macro imm_read
@@ -49,7 +49,7 @@ i_fetch:
     mov ir, mdr
     jmp i_decode
 inc_pc:
-    inc pc
+    add pc, pc, 1
     jmp i_fetch
 i_decode:
     je ir, 69, op_adc_69_imm
@@ -72,7 +72,7 @@ op_and_29_imm:
 op_asl_0A_acc:
     mov carry, acc[7]
     mov acc[7:1], acc[6:0]
-    clr acc[0]
+    mov acc[0], 0
     jmp inc_pc
 op_jmp_4C_abs:
     abs_read
