@@ -1,14 +1,17 @@
-
 from parser import parse
 from visitor import construct_cfg
 from ssa import construct_ssa
 
-## global dictionary for data
+# global dictionary for data
 scope = {}
 
-scope['unit'] = parse("a.asm")
+parse("a.asm", scope)
 construct_cfg(scope)
 construct_ssa(scope)
+
+from hdl import find_raw
+
+print(find_raw(scope))
 
 print(scope)
 

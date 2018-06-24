@@ -85,6 +85,11 @@ class AssignLabelVisitor(AsmGenericVisitor):
         scope['id_instruction'][node[-1]] = node
 
 
+class IdRegVisitor(AsmGenericVisitor):
+    def visit_reg(self, node, scope):
+        scope['id_reg'][node[-1]] = node
+
+
 class LabelVisitor(AsmGenericVisitor):
     def visit_label(self, node, scope):
         scope['label_label_def'][node[-1]] = scope['label_def'][node[1]]
@@ -120,12 +125,17 @@ def construct_cfg(scope):
     # assign id to each label
     # establish mapping between label id and instruction id
     # map instruction id to instruction
+    # map reg id to register
     scope['label_instruction'] = {}
     scope['label_def'] = {}
     scope['id_instruction'] = {}
+    scope['id_reg'] = {}
 
     id_visitor = AssignLabelVisitor()
     id_visitor.visit(scope['unit'], scope)
+
+    id_reg_visitor = IdRegVisitor()
+    id_reg_visitor.visit(scope['unit'], scope)
 
     # establish mapping between label and label definition
     scope['label_label_def'] = {}

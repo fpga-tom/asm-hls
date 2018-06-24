@@ -207,7 +207,7 @@ def t_error(t):
     t.lexer.skip(1)
 
 
-def parse(file):
+def parse(file, scope):
     f = open(file)
     for line in f:
         if re.match(r'[a-zA-Z_][a-zA-Z_0-9]*:', line):
@@ -220,4 +220,4 @@ def parse(file):
     f = open(file)
     comp_unit = parser.parse(f.read())
     f.close()
-    return comp_unit
+    scope['unit'] = comp_unit

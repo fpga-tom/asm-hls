@@ -11,17 +11,23 @@ class SSAVistor(AsmGenericVisitor):
             if out_reg[-1] not in scope['ssa_form']:
                 if out_reg[1] not in scope['_ssa_reg_counter']:
                     scope['_ssa_reg_counter'][out_reg[1]] = 0
-                scope['ssa_form'][out_reg[-1]] = scope['_ssa_reg_counter'][out_reg[1]] + 1
+                if out_reg[1] not in scope['ssa_form_def']:
+                    scope['ssa_form_def'][out_reg[1]] = out_reg[-1]
+                scope['ssa_form'][out_reg[-1]] = (scope['_ssa_reg_counter'][out_reg[1]] + 1, scope['_instruction'][-1])
 
             for reg in scope['_reg'][1:]:
                 if reg[1] not in scope['_ssa_reg_counter']:
                     scope['_ssa_reg_counter'][reg[1]] = 0
-                scope['ssa_form'][reg[-1]] = scope['_ssa_reg_counter'][reg[1]]
+                scope['ssa_form'][reg[-1]] = (scope['_ssa_reg_counter'][reg[1]], scope['_instruction'][-1])
 
             scope['_ssa_reg_counter'][out_reg[1]] += 1
 
     def visit_reg(self, node, scope):
         scope['_reg'] += [node]
+
+    def visit_instruction(self, node, scope):
+        scope['_instruction'] = node
+        super(SSAVistor, self).visit_instruction(node, scope)
 
 
 def construct_ssa(scope):
@@ -29,6 +35,7 @@ def construct_ssa(scope):
     visited = set()
 
     scope['ssa_form'] = {}
+    scope['ssa_form_def'] = {}
     scope['_ssa_reg_counter'] = {}
     ssa_visitor = SSAVistor()
 
