@@ -83,6 +83,7 @@ class AssignLabelVisitor(AsmGenericVisitor):
             scope['label_instruction'][self.label_def_id] = node[-1]
             self.label_def_id = -1
         scope['id_instruction'][node[-1]] = node
+        print(node)
 
 
 class IdRegVisitor(AsmGenericVisitor):

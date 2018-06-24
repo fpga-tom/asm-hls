@@ -17,13 +17,13 @@ def _write_set(i):
 
 def find_raw(scope):
     raw = {}
-    for reg, ssa in scope['ssa_form'].iteritems():
-        (reg_ssa, instruction_id) = ssa
-        if reg_ssa > 0:
-            reg_name = scope['id_reg'][reg][1] # get register name from register id
-            reg_ssa_def = scope['ssa_form_def'][reg_name] # get ssa definition register
-            _, def_instruction_id = scope['ssa_form'][reg_ssa_def] # get defining instruction
-            raw[instruction_id] = def_instruction_id
+    for reg, instruction in scope['ssa_form'].iteritems():
+        (reg_name, ssa_id) = reg
+        if ssa_id > 0:
+            def_instruction = scope['ssa_form_def'][(reg[0][1], reg[1])] # get ssa definition instruction
+            if instruction[-1] not in raw:
+                raw[instruction[-1]] = []
+            raw[instruction[-1]] += [def_instruction[-1]]
     return raw
 
 # def find_war():

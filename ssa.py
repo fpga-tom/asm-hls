@@ -8,17 +8,14 @@ class SSAVistor(AsmGenericVisitor):
             self.visit(arg, scope)
         if scope['_reg']:
             out_reg = scope['_reg'][0]
-            if out_reg[-1] not in scope['ssa_form']:
-                if out_reg[1] not in scope['_ssa_reg_counter']:
-                    scope['_ssa_reg_counter'][out_reg[1]] = 0
-                if out_reg[1] not in scope['ssa_form_def']:
-                    scope['ssa_form_def'][out_reg[1]] = out_reg[-1]
-                scope['ssa_form'][out_reg[-1]] = (scope['_ssa_reg_counter'][out_reg[1]] + 1, scope['_instruction'][-1])
+            if out_reg[1] not in scope['_ssa_reg_counter']:
+                scope['_ssa_reg_counter'][out_reg[1]] = 0
+            scope['ssa_form_def'][(out_reg[1], scope['_ssa_reg_counter'][out_reg[1]] + 1)] = scope['_instruction']
 
             for reg in scope['_reg'][1:]:
                 if reg[1] not in scope['_ssa_reg_counter']:
                     scope['_ssa_reg_counter'][reg[1]] = 0
-                scope['ssa_form'][reg[-1]] = (scope['_ssa_reg_counter'][reg[1]], scope['_instruction'][-1])
+                scope['ssa_form'][(reg, scope['_ssa_reg_counter'][reg[1]])] = scope['_instruction']
 
             scope['_ssa_reg_counter'][out_reg[1]] += 1
 
