@@ -1,7 +1,7 @@
 ####################################################################
 ####################################################################
 ##
-##          VISITOR
+## VISITOR
 ##
 ####################################################################
 ####################################################################
@@ -82,6 +82,7 @@ class AssignLabelVisitor(AsmGenericVisitor):
         if self.label_def_id != -1:
             scope['label_instruction'][self.label_def_id] = node[-1]
             self.label_def_id = -1
+        scope['id_instruction'][node[-1]] = node
 
 
 class LabelVisitor(AsmGenericVisitor):
@@ -118,8 +119,10 @@ def construct_cfg(scope):
     # assign label to each instruction
     # assign id to each label
     # establish mapping between label id and instruction id
+    # map instruction id to instruction
     scope['label_instruction'] = {}
     scope['label_def'] = {}
+    scope['id_instruction'] = {}
 
     id_visitor = AssignLabelVisitor()
     id_visitor.visit(scope['unit'], scope)
