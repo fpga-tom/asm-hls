@@ -9,11 +9,19 @@ parse("b.asm", scope)
 construct_cfg(scope)
 construct_ssa(scope)
 
-from hdl import find_raw
+from hdl import find_raw, asap, clique, cover
+find_raw(scope)
+asap(scope)
+clique(scope)
+cover(scope)
 
-print(find_raw(scope))
+print('raw', scope['raw'])
+print('asap', scope['asap'])
+print('clique', scope['clique'])
+print('cover', scope['cover'])
 
-print(scope['cfg'])
-print(scope['ssa_form_def'])
-print(scope['ssa_form'])
+# print(scope['cfg'])
+# print(scope['ssa_form_def'])
+# print(scope['ssa_form'])
+
 

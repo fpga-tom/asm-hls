@@ -24,88 +24,74 @@ def find_raw(scope):
             if instruction[-1] not in raw:
                 raw[instruction[-1]] = []
             raw[instruction[-1]] += [def_instruction[-1]]
-    return raw
+    scope['raw'] = raw
 
-# def find_war():
-#     war = {}
-#     for i in range(0, len(comp_unit)):
-#         for j in range(i+1, len(comp_unit)):
-#             if set.intersection(_write_set(comp_unit[j]), _read_set(comp_unit[i])):
-#                     war[j] = i
-#     return war
-#
-# def find_waw():
-#     waw = {}
-#     for i in range(0, len(comp_unit)):
-#         for j in range(i+1, len(comp_unit)):
-#             if set.intersection(_write_set(comp_unit[j]), _write_set(comp_unit[i])):
-#                     waw[j] = i
-#     return waw
-#
-# def data_dependencies(scope):
-#     return (find_raw(), find_war(), find_waw())
-#
-# def eliminate(raw, war):
-#     for k,v in war.iteritems():
-#         if not k in raw or raw[k] != v:
-#             _reg = comp_unit[v][1][1]
-#             reg = _reg + "_" + str(k)
-#             comp_unit[k][1][0] = reg
-#             for j in range(k+1, len(comp_unit)):
-#                 if comp_unit[j][1][0] == _reg:
-#                     comp_unit[j][1][0] = reg
-#                 if comp_unit[j][1][1] == _reg:
-#                     comp_unit[j][1][1] = reg
-#                 if comp_unit[j][1][2] == _reg:
-#                     comp_unit[j][1][2] = reg
-#
-# def asap(raw):
-#     control_step = {}
-#     for i in range(0, len(comp_unit)):
-#         if not i in raw:
-#             control_step[i] = [0]
-#         else:
-#             control_step[i] = [max(control_step[raw[i]]) + 1]
-#     return control_step
-#
-#
-#
-# def clique(sch):
-#     cli = {}
-#     for a in sch:
-#         a_l = []
-#         for b in sch:
-#             if not set.intersection(set(sch[a]), set(sch[b])):
-#                 a_l = a_l + [b]
-#         cli[a] = a_l
-#     return cli
+def asap(scope):
+    control_step = {}
+    queue = [min(scope['cfg'].keys())]
+    visited = set()
+
+    while queue:
+        curr = queue.pop(0)
+        if curr not in visited:
+            if scope['id_instruction'][curr][1][1] not in ['jmp']:
+                if curr not in scope['raw']:
+                    control_step[curr] = [0]
+                else:
+                    control_step[curr] = [max(control_step[x][0] for x in scope['raw'][curr]) + 1]
+
+            nxt = scope['cfg'][curr]
+            queue += nxt
+            visited.add(curr)
+
+    scope['asap'] = control_step
+
+
+def clique(scope):
+    cli = {}
+    sch = scope['asap']
+    for a in sch:
+        a_l = []
+        for b in sch:
+            if not set.intersection(set(sch[a]), set(sch[b])):
+                if scope['id_instruction'][a][1][1] == scope['id_instruction'][b][1][1]:
+                    a_l = a_l + [b]
+        cli[a] = a_l
+    scope['clique'] = cli
+
+
+def cover(scope):
+    cliques = scope['clique']
+    cli_complement = nx.complement(nx.from_dict_of_lists(cliques))
+    coloring = nx.coloring.greedy_color(cli_complement)
+    result = {}
+    for key, val in coloring.iteritems():
+        if val not in result:
+            result[val] = []
+        result[val] += [key]
+    scope['cover'] = [set(l) for k,l in result.iteritems()]
+
+
+def reg_schedule(scope):
+    schedule = scope['asap']
+    reg_schedule = {}
+    for f, t in schedule.iteritems():
+        for r in _reg_list(comp_unit[f]):
+            if r not in reg_schedule:
+                reg_schedule[r] = []
+            reg_schedule[r] += t
+
+    return reg_schedule
+
 #
 #
 # def reverse(y):
 #     return {z:xi for xi, x in enumerate(y) for z in x}
 #
 #
-# def cover(cliques):
-#     cli_complement = nx.complement(nx.from_dict_of_lists(cliques))
-#     coloring = nx.coloring.greedy_color(cli_complement)
-#     result = {}
-#     for key, val in coloring.iteritems():
-#         if val not in result:
-#             result[val] = []
-#         result[val] += [key]
-#     return [set(l) for k,l in result.iteritems()]
 #
 #
-# def reg_schedule(schedule):
-#     result = {}
-#     reg_schedule = {}
-#     for f, t in schedule.iteritems():
-#         for r in _reg_list(comp_unit[f]):
-#             if r not in reg_schedule:
-#                 reg_schedule[r] = []
-#             reg_schedule[r] += t
-#
-#     return reg_schedule
+
 #
 #
 # def find_signals(_reg_cover_reverse, _fun_cover, _fun_cover_reverse):
@@ -174,26 +160,6 @@ def find_raw(scope):
 #                     act[act_reg] = []
 #                 act[act_reg] += [{i: act_in}]
 #     return act
-#
-#
-# raw, war, waw = data_dependencies()
-# print("RAW: ", raw)
-# print("WAR: ", war)
-# print("WAW: ", waw)
-#
-# while True:
-#     raw, war, waw = data_dependencies()
-#     eliminate(raw, war)
-# #    raw, war, waw = data_dependencies()
-# #    eliminate(raw, waw)
-#     break
-#
-# print(comp_unit)
-# raw, war, waw = data_dependencies()
-# print("RAW: ", raw)
-# print("WAR: ", war)
-# print("WAW: ", waw)
-#
 #
 #
 #
