@@ -21,6 +21,7 @@ reserved = {
     'je' : 'JE',
     'jne' : 'JNE',
     'add' : 'ADD',
+    'mul' : 'MUL',
     'and' : 'AND'
 }
 
@@ -174,6 +175,7 @@ def p_opcode(p):
      | JE
      | JNE
      | ADD
+     | MUL
      | AND'''
     global node_count
     p[0] = ('opcode', p[1], node_count)

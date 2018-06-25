@@ -3,12 +3,12 @@ from visitor import AsmGenericVisitor
 
 class SSAVistor(AsmGenericVisitor):
     def is_output(self, opcode, idx):
-        if opcode[1] in ['mov', 'add', 'and']:
+        if opcode[1] in ['mov', 'add', 'and', 'mul']:
             return idx == 0
         return False
 
     def is_input(self, opcode, idx):
-        if opcode[1] in ['mov', 'add', 'and']:
+        if opcode[1] in ['mov', 'add', 'and', 'mul']:
             return idx > 0
         if opcode[1] in ['je', 'jne']:
             return idx == 0 or idx == 1
