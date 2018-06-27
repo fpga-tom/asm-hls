@@ -24,7 +24,8 @@ class SSAVistor(AsmGenericVisitor):
                     if scope['_opcode'][1] not in ['je', 'jne']:
                         if reg[1] not in scope['_ssa_reg_counter']:
                             scope['_ssa_reg_counter'][reg[1]] = 0
-                        scope['ssa_form_def'][(reg[1], scope['_ssa_reg_counter'][reg[1]] + 1)] = scope['_instruction']
+                        scope['ssa_form_def'][(reg, scope['_ssa_reg_counter'][reg[1]] + 1)] = scope['_instruction']
+                        scope['ssa_form_def_'][(reg[1], scope['_ssa_reg_counter'][reg[1]] + 1)] = scope['_instruction']
 
                 if self.is_input(scope['_opcode'], i):
                     if reg[1] not in scope['_ssa_reg_counter']:
@@ -52,6 +53,7 @@ def construct_ssa(scope):
 
     scope['ssa_form'] = {}
     scope['ssa_form_def'] = {}
+    scope['ssa_form_def_'] = {}
     scope['_ssa_reg_counter'] = {}
     ssa_visitor = SSAVistor()
 

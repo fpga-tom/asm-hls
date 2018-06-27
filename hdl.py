@@ -1,30 +1,17 @@
 import networkx as nx
 
-def _reg_list(i):
-    return i[1]
-
-def _read(i):
-    return _reg_list(i)[1:]
-
-def _read_set(i):
-    return set(_read(i))
-
-def _write(i):
-    return [_reg_list(i)[0]]
-
-def _write_set(i):
-    return set(_write(i))
 
 def find_raw(scope):
     raw = {}
     for reg, instruction in scope['ssa_form'].iteritems():
         (reg_name, ssa_id) = reg
         if ssa_id > 0:
-            def_instruction = scope['ssa_form_def'][(reg[0][1], reg[1])] # get ssa definition instruction
+            def_instruction = scope['ssa_form_def_'][(reg[0][1], reg[1])] # get ssa definition instruction
             if instruction[-1] not in raw:
                 raw[instruction[-1]] = []
             raw[instruction[-1]] += [def_instruction[-1]]
     scope['raw'] = raw
+
 
 def asap(scope):
     control_step = {}
@@ -60,8 +47,7 @@ def clique(scope):
     scope['clique'] = cli
 
 
-def cover(scope):
-    cliques = scope['clique']
+def _cover(cliques):
     cli_complement = nx.complement(nx.from_dict_of_lists(cliques))
     coloring = nx.coloring.greedy_color(cli_complement)
     result = {}
@@ -69,153 +55,142 @@ def cover(scope):
         if val not in result:
             result[val] = []
         result[val] += [key]
-    scope['cover'] = [set(l) for k,l in result.iteritems()]
+    return result
 
 
-def reg_schedule(scope):
+def cover(scope):
+    cliques = scope['clique']
+    result = _cover(cliques)
+    scope['cover'] = result
+
+
+def reg_asap(scope):
     schedule = scope['asap']
     reg_schedule = {}
-    for f, t in schedule.iteritems():
-        for r in _reg_list(comp_unit[f]):
-            if r not in reg_schedule:
-                reg_schedule[r] = []
-            reg_schedule[r] += t
 
-    return reg_schedule
+    for reg, instruction in scope['ssa_form'].iteritems():
+        if reg[0][1] not in reg_schedule:
+            reg_schedule[reg[0][1]] = []
+        reg_schedule[reg[0][1]] += schedule[instruction[-1]]
 
-#
-#
-# def reverse(y):
-#     return {z:xi for xi, x in enumerate(y) for z in x}
-#
-#
-#
-#
+    for reg, instruction in scope['ssa_form_def'].iteritems():
+        if reg[0][1] not in reg_schedule:
+            reg_schedule[reg[0][1]] = []
+        reg_schedule[reg[0][1]] += schedule[instruction[-1]]
 
-#
-#
-# def find_signals(_reg_cover_reverse, _fun_cover, _fun_cover_reverse):
-#     signals = {}
-#     fun = {}
-#     for i, f in _fun_cover_reverse.iteritems():
-#         for ri, r in enumerate(_read(comp_unit[i])):
-#             fn = 'f'+ "_" + str(f) + "_" + str(ri)
-#             if fn not in signals:
-#                 signals[fn] = []
-#                 fun[fn] = f
-#             signals[fn] += [str(_reg_cover_reverse[r])]
-#
-#     return signals, fun
-#
-# def find_signals_regs(_reg_cover_reverse, _fun_cover, _fun_cover_reverse):
-#     signals = {}
-#     fun = {}
-#     for i, f in _fun_cover_reverse.iteritems():
-#         for ri, r in enumerate(_write(comp_unit[i])):
-#             fn = str(_reg_cover_reverse[r])
-#             if fn not in signals:
-#                 signals[fn] = set()
-#                 fun[fn] = f
-#             signals[fn] = set.union(signals[fn], set(['f_' + str(f)]))
-#
-#     return signals, fun
-#
-#
-# def find_reg_in_mux(signals):
-#     result = {}
-#     for key, val in signals.iteritems():
-#         for v in val:
-#             if v not in result:
-#                 result[v] = []
-#             result[v] += [key]
-#     return result
-#
-#
-# def active(sch, _mux, _fun_cover_reverse, _reg_cover_reverse):
-#     m = max([max(v) for k,v in sch.iteritems()]) + 1
-#     act = {}
-#     for i in range(0, m):
-#         a = [k for k,v in sch.iteritems() if v[0] == i]
-#         for j in a:
-#             for ri, r in enumerate(_read(comp_unit[j])):
-#                 act_reg = str(_reg_cover_reverse[r])
-#                 act_fn = 'f_' + str(_fun_cover_reverse[j]) +  '_' + str(ri)
-#                 act_in = _mux[act_fn].index(act_reg)
-#                 if act_fn not in act:
-#                     act[act_fn] = []
-#                 act[act_fn] += [{i: act_in}]
-#     return act
-#
-# def active_reg_in_mux(sch, _mux, _fun_cover_reverse, _reg_cover_reverse):
-#     m = max([max(v) for k,v in sch.iteritems()]) + 1
-#     act = {}
-#     for i in range(0, m):
-#         a = [k for k,v in sch.iteritems() if v[0] == i]
-#         for j in a:
-#             for ri, r in enumerate(_write(comp_unit[j])):
-#                 act_reg = str(_reg_cover_reverse[r])
-#                 act_fn = 'f_' + str(_fun_cover_reverse[j])
-#                 act_in = list(_mux[act_reg]).index(act_fn)
-#                 if act_reg not in act:
-#                     act[act_reg] = []
-#                 act[act_reg] += [{i: act_in}]
-#     return act
-#
-#
-#
-# # functional units
-# schedule = asap(raw)
-# print'schedule'
-# print(schedule)
-# # construct graph
-# cli = clique(schedule)
-# print 'graph'
-# print cli
-# # find clique cover
-# fun = cover(cli)
-# fun_reverse = reverse(fun)
-# print '_fun'
-# print(fun)
-# print '_fun_cover_reverse'
-# print(fun_reverse)
-#
-#
-#
-# # registers
-# r_schedule = reg_schedule(schedule)
-# print('registers schedule')
-# print(r_schedule)
-# rc = clique(r_schedule)
-# print('registers graph')
-# print(rc)
-# reg_cov = cover(rc)
-# reg_cov_reverse = reverse(reg_cov)
-# print('reg_cover')
-# print reg_cov
-# print('reg_cover_reverse')
-# print reg_cov_reverse
-#
-#
-# # input muxes to funs
-# signals, fun_input = find_signals(reg_cov_reverse, fun, fun_reverse)
-# print('signals')
-# print(signals)
-#
-# act = active(schedule, signals, fun_reverse, reg_cov_reverse)
-# print("mux activity")
-# print(act)
-#
-# signals_regs, reg_input = find_signals_regs(reg_cov_reverse, fun, fun_reverse)
-# print('signals reg')
-# print(signals_regs)
-#
-# print('reg_in mux')
-# reg_in_mux = find_reg_in_mux(signals_regs)
-# print(reg_in_mux)
-#
-# act_reg_in_mux = active_reg_in_mux(schedule, signals_regs, fun_reverse, reg_cov_reverse)
-# print("mux reg in activity")
-# print(act_reg_in_mux)
+    scope['reg_asap'] = reg_schedule
+
+
+def reg_clique(scope):
+    cli = {}
+    sch = scope['reg_asap']
+    for a in sch:
+        a_l = []
+        for b in sch:
+            if not set.intersection(set(sch[a]), set(sch[b])):
+                a_l = a_l + [b]
+        cli[a] = a_l
+    scope['reg_clique'] = cli
+
+
+def reg_cover(scope):
+    cliques = scope['reg_clique']
+    result = _cover(cliques)
+    scope['reg_cover'] = result
+
+
+def signals(scope):
+    sig = {}
+    result = {}
+    cover = scope['cover']
+    cover_reverse = {vv:k for k, v in cover.iteritems() for vv in v}
+    reg_cover = scope['reg_cover']
+    reg_cover_reverse = {vv: k for k, v in reg_cover.iteritems() for vv in v}
+
+    for reg_ssa, instruction in scope['ssa_form'].iteritems():
+        (reg, ssa) = reg_ssa
+        sig[(reg[-1], instruction[-1])] = scope['asap'][instruction[-1]]
+
+    for id_reg_id_instruction, control_step in sig.iteritems():
+        (id_reg, id_instruction) = id_reg_id_instruction
+        id_funit = cover_reverse[id_instruction]
+        reg_name = scope['id_reg'][id_reg][1]
+        reg_slot = scope['id_reg_slot'][id_reg]
+        id_runit = reg_cover_reverse[reg_name]
+        if (id_runit, id_funit, reg_slot) not in result:
+            result[(id_runit, id_funit, reg_slot)] =[]
+        result[(id_runit, id_funit, reg_slot)] += control_step
+
+    scope['signals_in'] = result
+
+    sig = {}
+    result = {}
+    for reg_ssa, instruction in scope['ssa_form_def'].iteritems():
+        (reg, ssa) = reg_ssa
+        sig[(instruction[-1], reg[-1])] = scope['asap'][instruction[-1]]
+
+    for id_instruction_id_reg, control_step in sig.iteritems():
+        (id_instruction, id_reg) = id_instruction_id_reg
+        id_funit = cover_reverse[id_instruction]
+        reg_name = scope['id_reg'][id_reg][1]
+        id_runit = reg_cover_reverse[reg_name]
+        if (id_funit, id_runit) not in result:
+            result[(id_funit, id_runit)] =[]
+        result[(id_funit, id_runit)] += control_step
+
+    scope['signals_out'] = result
+
+
+def muxes(scope):
+    keys = scope['signals_in'].keys()
+    mux = {}
+    for i, j in enumerate(keys):
+        for k in keys[i+1:]:
+            if j[1] == k[1] and j[2] == k[2]:
+                mux_id = (j[1], j[2])
+                if mux_id not in mux:
+                    mux[mux_id] = []
+                mux[mux_id] += [j, k]
+
+    scope['muxes_in'] = mux
+
+    keys = scope['signals_out'].keys()
+    mux = {}
+    for i, j in enumerate(keys):
+        for k in keys[i+1:]:
+            if j[1] == k[1]:
+                mux_id = j[1]
+                if mux_id not in mux:
+                    mux[mux_id] = []
+                mux[mux_id] += [j, k]
+
+    scope['muxes_out'] = mux
+
+
+def fsm(scope):
+    status_signals = {}
+    for mux, sig in scope['muxes_in'].iteritems():
+        for i, s in enumerate(sig):
+            control_steps = scope['signals_in'][s]
+            for control_step in control_steps:
+                if control_step not in status_signals:
+                    status_signals[control_step] = {}
+                if mux not in status_signals[control_step]:
+                    status_signals[control_step][mux] = {}
+                status_signals[control_step][mux] = i
+
+    for mux, sig in scope['muxes_out'].iteritems():
+        for i, s in enumerate(sig):
+            control_steps = scope['signals_out'][s]
+            for control_step in control_steps:
+                if control_step not in status_signals:
+                    status_signals[control_step] = {}
+                if mux not in status_signals[control_step]:
+                    status_signals[control_step][mux] = {}
+                status_signals[control_step][mux] = i
+
+    scope['fsm'] = status_signals
+
 #
 # from jinja2 import Environment, FileSystemLoader
 #

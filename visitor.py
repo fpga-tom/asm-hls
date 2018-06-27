@@ -94,6 +94,16 @@ class IdRegVisitor(AsmGenericVisitor):
 class LabelVisitor(AsmGenericVisitor):
     def visit_label(self, node, scope):
         scope['label_label_def'][node[-1]] = scope['label_def'][node[1]]
+        
+class RegSlotVisitor(AsmGenericVisitor):
+    def visit_reg(self, node, scope):
+        scope['_reg'] += [node]
+
+    def visit_arg_list(self, node, scope):
+        scope['_reg'] = []
+        super(RegSlotVisitor, self).visit_arg_list(node, scope)
+        for i, r in enumerate(scope['_reg']):
+            scope['id_reg_slot'][r[-1]] = i
 
 
 class CFGVisitor(AsmGenericVisitor):
@@ -131,12 +141,16 @@ def construct_cfg(scope):
     scope['label_def'] = {}
     scope['id_instruction'] = {}
     scope['id_reg'] = {}
+    scope['id_reg_slot'] = {}
 
     id_visitor = AssignLabelVisitor()
     id_visitor.visit(scope['unit'], scope)
 
     id_reg_visitor = IdRegVisitor()
     id_reg_visitor.visit(scope['unit'], scope)
+
+    id_reg_slot_visitor = RegSlotVisitor()
+    id_reg_slot_visitor.visit(scope['unit'], scope)
 
     # establish mapping between label and label definition
     scope['label_label_def'] = {}
