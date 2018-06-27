@@ -9,7 +9,8 @@ parse("b.asm", scope)
 construct_cfg(scope)
 construct_ssa(scope)
 
-from hdl import find_raw, asap, clique, cover, reg_asap, reg_clique, reg_cover, signals, muxes, fsm
+from hdl import find_raw, asap, clique, cover, reg_asap, reg_clique, reg_cover, signals, muxes, fsm, \
+    generate_verilog
 find_raw(scope)
 asap(scope)
 clique(scope)
@@ -33,6 +34,8 @@ print('signals_out', scope['signals_out'])
 print('muxes_in', scope['muxes_in'])
 print('muxes_out', scope['muxes_out'])
 print('fsm', scope['fsm'])
+
+generate_verilog(scope)
 
 # print(scope['cfg'])
 # print(scope['ssa_form_def'])

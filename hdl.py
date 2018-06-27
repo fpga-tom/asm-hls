@@ -191,89 +191,117 @@ def fsm(scope):
 
     scope['fsm'] = status_signals
 
-#
-# from jinja2 import Environment, FileSystemLoader
-#
-# def generate_add(fun):
-#     result = {}
-#     for fi, f in enumerate(fun):
-#         result[fi] = {
-#                 'in0': 'f_' + str(fi) + '_0',
-#                 'in1': 'f_' + str(fi) + '_1',
-#                 'out': 'f_' + str(fi)
-#                 }
-#     return result
-#
-# def generate_reg(reg):
-#     result = {}
-#     for ri, r in enumerate(reg):
-#         result[ri] = {
-#                 'out': 'r'+str(ri),
-#                 'in': 'm' + str(ri)
-#                 }
-#     return result
-#
-# def generate_mux(signals, fun, reg):
-#     result = {}
-#     for ri, r in signals.iteritems():
-#         result[ri] = {
-#                 'in': ['r' + str(i) for i in r],
-#                 'out': ri,
-#                 'ctrl': ri + "_ctrl"
-#                 }
-#     return result
-#
-# def generate_m_mux(reg_in_mux):
-#     result = {}
-#     for ri, r in reg_in_mux.iteritems():
-#         result[ri] = {
-#                 'in': [i for i in r],
-#                 'out': 'm' + str(ri),
-#                 'ctrl': 'm_' + ri + "_ctrl"
-#                 }
-#     return result
-#
-# def generate_fsm(schedule, mux_act, mux_reg_in_act):
-#     result = {}
-#     m = max([max(v) for k,v in schedule.iteritems()]) + 1
-#     for i in range(0, m):
-#         result[i] = {
-#                 'signals': [ {xi + "_ctrl":y[i]} for xi, x in mux_act.iteritems() for y in x if i in y.keys() ]
-#                 + [ {'m_'+xi + "_ctrl":y[i]} for xi, x in mux_reg_in_act.iteritems() for y in x if i in y.keys() ],
-#                 'next': ((i+1) % m)
-#                 }
-#     return result
-#
-#
-#
-# def generate_verilog(fun, reg, signals, signals_regs):
-#     file_loader = FileSystemLoader('templates')
-#     env = Environment(loader=file_loader)
-#
-#     template_adder = env.get_template('adder.v')
-#     output_adder = template_adder.render()
-#
-#     template_mux = env.get_template('mux.v')
-#     output_mux = template_mux.render()
-#
-#     template_register = env.get_template('register.v')
-#     output_register = template_register.render()
-#
-#     template_top = env.get_template('top.v')
-#     output_top = template_top.render({
-#         'regs' : generate_reg(reg),
-#         'fun': generate_add(fun),
-#         'mux': generate_mux(signals, fun, reg),
-#         'm_mux': generate_m_mux(signals_regs),
-#         'fsm': generate_fsm(schedule, act, act_reg_in_mux)
-#         })
-#
-#     print(output_adder)
-#     print(output_mux)
-#     print(output_register)
-#     print(output_top)
-#
-# generate_verilog(fun, reg_cov, signals, signals_regs)
-#
-#
-#
+
+from jinja2 import Environment, FileSystemLoader
+
+
+def is_fun(scope, id_fun, opcode):
+    id_cover = scope['cover'][id_fun][0]
+    instruction = scope['id_instruction'][id_cover]
+    return instruction[1][1] == opcode
+
+def is_mux(mux, k):
+    for m, v in mux.iteritems():
+        if k in v:
+            return True
+    return False
+
+def generate_opcode(scope, opcode):
+    result = {}
+    signals_out = scope['signals_out']
+    fun = [k for k in signals_out.keys() if is_fun(scope, k[0], opcode)]
+    for f in fun:
+        if 'fun_' + str(f[0]) not in result:
+            result['fun_' + str(f[0])] = {}
+        result['fun_' + str(f[0])]['out'] = 'fun_out_' + str(f[0])
+
+    signals_in = scope['signals_in']
+    fun = [k for k in signals_in.keys() if is_fun(scope, k[1], opcode)]
+    for f in fun:
+        fi = "_".join(map(str, f))
+        if 'fun_' + str(f[1]) not in result:
+            result['fun_' + str(f[1])] = {}
+        if not is_mux(scope['muxes_in'], k):
+            result['fun_' + str(f[1])]['in' + str(f[2])] = 'reg_out_' + str(f[0])
+        else:
+            result['fun_' + str(f[1])]['in' + str(f[2])] = 'mux_out_' + str(f[1]) + '_' + str(f[2])
+    return result
+
+
+def generate_mux(scope):
+    result = {}
+    mux_out = scope['muxes_out']
+    for mux, r in mux_out.iteritems():
+        fi = str(mux)
+        for i, fun in enumerate(r):
+            if 'mux_' + fi not in result:
+                result['mux_' + fi] = {}
+            result['mux_' + fi]['in' + str(i)] = 'fun_out_' + str(fun[0])
+        result['mux_' + fi]['out'] = 'mux_out_' + fi
+
+    mux_in = scope['muxes_in']
+    for mux, r in mux_in.iteritems():
+        fi = '_'.join(map(str, mux))
+        for i, reg in enumerate(r):
+            if 'mux_' + fi not in result:
+                result['mux_' + fi] = {}
+            result['mux_' + fi]['in' + str(i)] = 'reg_out_' + str(reg[0])
+        result['mux_' + fi]['out'] = 'mux_out_' + fi
+    return result
+
+
+def generate_reg(scope):
+    result = {}
+    for r, v in scope['reg_cover'].iteritems():
+        result['reg_' + str(r)] = {'out': 'reg_out_' + str(r)}
+
+    for k, v in scope['signals_out'].iteritems():
+        if not is_mux(scope['muxes_out'], k):
+            result['reg_' + str(k[1])]['in'] = 'fun_out_' + str(k[0])
+        else:
+            result['reg_' + str(k[1])]['in'] = 'mux_out_' + str(k[1])
+    return result
+
+def generate_fsm(scope):
+    result = {}
+    for control_step, signals in scope['fsm'].iteritems():
+        sigs = {'mux_' + '_'.join(map(str, k if isinstance(k, tuple) else [k])): v for k, v in signals.iteritems()}
+        result[control_step] = {
+            'state': control_step,
+            'next_state': (control_step + 1) % (max(x[0] for x in scope['asap'].values()) + 1),
+            'signals': sigs
+        }
+    return result
+
+
+def generate_verilog(scope):
+    file_loader = FileSystemLoader('templates')
+    env = Environment(loader=file_loader)
+
+    template_adder = env.get_template('adder.v')
+    output_adder = template_adder.render()
+
+    template_mux = env.get_template('mux.v')
+    output_mux = template_mux.render()
+
+    template_register = env.get_template('register.v')
+    output_register = template_register.render()
+
+    template_top = env.get_template('top.v')
+    output_top = template_top.render({
+        'regs' : generate_reg(scope),
+        'add': generate_opcode(scope, 'add'),
+        'mul': generate_opcode(scope, 'mul'),
+        'mov': generate_opcode(scope, 'mov'),
+        'mux': generate_mux(scope),
+        'fsm': generate_fsm(scope)
+        })
+
+    print(output_adder)
+    print(output_mux)
+    print(output_register)
+    print(output_top)
+
+
+
+
