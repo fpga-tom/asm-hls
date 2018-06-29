@@ -288,18 +288,30 @@ def generate_verilog(scope):
     output_register = template_register.render()
 
     template_top = env.get_template('top.v')
+    scope['all_signals'] = set()
+    _reg = generate_reg(scope)
+    _add = generate_opcode(scope, 'add')
+    _mul = generate_opcode(scope, 'mul')
+    _mov = generate_opcode(scope, 'mov')
+    _mux =generate_mux(scope)
+    scope['all_signals'] |= set([ v['out'] for k, v in _reg.iteritems()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _add.iteritems()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _mul.iteritems()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _mov.iteritems()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _mux.iteritems()])
+    scope['all_signals'] |= set([ k  for k, v in _mux.iteritems()])
     output_top = template_top.render({
         'regs' : generate_reg(scope),
         'add': generate_opcode(scope, 'add'),
         'mul': generate_opcode(scope, 'mul'),
         'mov': generate_opcode(scope, 'mov'),
         'mux': generate_mux(scope),
-        'fsm': generate_fsm(scope)
+        'fsm': generate_fsm(scope),
+        'all_signals' : scope['all_signals'],
+        'bit_width': 16,
+        'bit_range': '[15:0]'
         })
 
-    print(output_adder)
-    print(output_mux)
-    print(output_register)
     print(output_top)
 
 
