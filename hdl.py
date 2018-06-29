@@ -100,6 +100,11 @@ def reg_cover(scope):
 
 
 def signals(scope):
+    '''
+    Creates dict of signals and assign control step to each one
+    :param scope:
+    :return:
+    '''
     sig = {}
     result = {}
     cover = scope['cover']
@@ -118,7 +123,7 @@ def signals(scope):
         reg_slot = scope['id_reg_slot'][id_reg]
         id_runit = reg_cover_reverse[reg_name]
         if (id_runit, id_funit, reg_slot) not in result:
-            result[(id_runit, id_funit, reg_slot)] =[]
+            result[(id_runit, id_funit, reg_slot)] = []
         result[(id_runit, id_funit, reg_slot)] += control_step
 
     scope['signals_in'] = result
