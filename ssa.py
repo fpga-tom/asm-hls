@@ -1,10 +1,12 @@
 from gen import get_node_cfg, get_node_ast
 
+def invert_dict(d):
+    return dict((new_key, [k for k, v in d.items() if new_key in v]) for value in d.values() for new_key in value)
+
 
 def is_output(instruction, arg):
     opcode = next(get_node_ast(instruction, 'opcode'))
-    arg_list = next(get_node_ast(instruction, 'arg_list'))
-    for idx, a in enumerate(get_node_ast(arg_list, 'arg')):
+    for idx, a in enumerate(get_node_ast(instruction, 'arg')):
         if arg == a:
             if opcode[1] in ['mov', 'add', 'and', 'mul']:
                 return idx == 0
@@ -15,8 +17,7 @@ def is_output(instruction, arg):
 
 def is_input(instruction, arg):
     opcode = next(get_node_ast(instruction, 'opcode'))
-    arg_list = next(get_node_ast(instruction, 'arg_list'))
-    for idx, a in enumerate(get_node_ast(arg_list, 'arg')):
+    for idx, a in enumerate(get_node_ast(instruction, 'arg')):
         if arg == a:
             if opcode[1] in ['mov', 'add', 'and', 'mul']:
                 return idx > 0
@@ -35,6 +36,10 @@ def construct_ssa(cfg):
     ssa_form_def = {}
     ssa_form_def_ = {}
     _ssa_reg_counter = {}
+
+    cfg_reverse = invert_dict(cfg)
+
+    phi = [k for k, v in cfg_reverse.items() if len(v) > 1]
 
     for instruction in get_node_cfg(cfg):
         for arg in get_node_ast(instruction, 'arg'):
