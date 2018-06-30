@@ -19,6 +19,8 @@ reserved = {
     'mov' : 'MOV',
     'jmp' : 'JMP',
     'je' : 'JE',
+    'jl' : 'JL',
+    'jg' : 'JG',
     'jne' : 'JNE',
     'add' : 'ADD',
     'mul' : 'MUL',
@@ -48,9 +50,9 @@ def p_unit(p):
             | unit statement NEWLINE'''
     global node_count
     if len(p) == 3:
-        p[0] = ('unit', [p[1]], node_count)
+        p[0] = ('unit', (p[1]), node_count)
     else:
-        p[0] = ('unit', p[1][1] + [p[2]], node_count)
+        p[0] = ('unit', (p[1][1], p[2]), node_count)
     node_count += 1
 
 def t_NEWLINE(t):
@@ -109,9 +111,9 @@ def p_instruction_list(p):
         | instruction_list instruction'''
     global node_count
     if len(p) == 2:
-        p[0] = ('instruction_list', [p[1]], node_count)
+        p[0] = ('instruction_list', (p[1]), node_count)
     else:
-        p[0] = ('instruction_list', p[1][1] + [p[2]], node_count)
+        p[0] = ('instruction_list', (p[1][1], p[2]), node_count)
     node_count += 1
 
 def p_range_1(p):
@@ -164,15 +166,17 @@ def p_arg_list(p):
         | arg_list COMMA arg'''
     global node_count
     if len(p) == 2:
-        p[0] = ('arg_list', [p[1]], node_count)
+        p[0] = ('arg_list', (p[1]), node_count)
     else:
-        p[0] = ('arg_list', p[1][1] + [p[3]], node_count)
+        p[0] = ('arg_list', (p[1][1], p[3]), node_count)
     node_count += 1
 
 def p_opcode(p):
     '''opcode : MOV
      | JMP
      | JE
+     | JL
+     | JG
      | JNE
      | ADD
      | MUL
@@ -209,7 +213,7 @@ def t_error(t):
     t.lexer.skip(1)
 
 
-def parse(file, scope):
+def parse(file):
     f = open(file)
     for line in f:
         if re.match(r'[a-zA-Z_][a-zA-Z_0-9]*:', line):
@@ -222,4 +226,4 @@ def parse(file, scope):
     f = open(file)
     comp_unit = parser.parse(f.read())
     f.close()
-    scope['unit'] = comp_unit
+    return comp_unit

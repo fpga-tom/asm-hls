@@ -1,66 +1,68 @@
-from visitor import AsmGenericVisitor
+from gen import get_node_cfg, get_node_ast
 
 
-class SSAVistor(AsmGenericVisitor):
-    def is_output(self, opcode, idx):
-        if opcode[1] in ['mov', 'add', 'and', 'mul']:
-            return idx == 0
-        return False
-
-    def is_input(self, opcode, idx):
-        if opcode[1] in ['mov', 'add', 'and', 'mul']:
-            return idx > 0
-        if opcode[1] in ['je', 'jne']:
-            return idx == 0 or idx == 1
-        return False
-
-    def visit_arg_list(self, node, scope):
-        scope['_reg'] = []
-        for arg in node[1]:
-            self.visit(arg, scope)
-        if scope['_reg']:
-            for i, reg in enumerate(scope['_reg']):
-                if self.is_output(scope['_opcode'], i):
-                    if scope['_opcode'][1] not in ['je', 'jne']:
-                        if reg[1] not in scope['_ssa_reg_counter']:
-                            scope['_ssa_reg_counter'][reg[1]] = 0
-                        scope['ssa_form_def'][(reg, scope['_ssa_reg_counter'][reg[1]] + 1)] = scope['_instruction']
-                        scope['ssa_form_def_'][(reg[1], scope['_ssa_reg_counter'][reg[1]] + 1)] = scope['_instruction']
-
-                if self.is_input(scope['_opcode'], i):
-                    if reg[1] not in scope['_ssa_reg_counter']:
-                        scope['_ssa_reg_counter'][reg[1]] = 0
-                    scope['ssa_form'][(reg, scope['_ssa_reg_counter'][reg[1]])] = scope['_instruction']
-
-                if self.is_output(scope['_opcode'], i):
-                    if scope['_opcode'][1] not in ['je', 'jne']:
-                        scope['_ssa_reg_counter'][reg[1]] += 1
-
-    def visit_reg(self, node, scope):
-        scope['_reg'] += [node]
-
-    def visit_opcode(self, node, scope):
-        scope['_opcode'] = node
-
-    def visit_instruction(self, node, scope):
-        scope['_instruction'] = node
-        super(SSAVistor, self).visit_instruction(node, scope)
+def is_output(instruction, arg):
+    opcode = next(get_node_ast(instruction, 'opcode'))
+    arg_list = next(get_node_ast(instruction, 'arg_list'))
+    for idx, a in enumerate(get_node_ast(arg_list, 'arg')):
+        if arg == a:
+            if opcode[1] in ['mov', 'add', 'and', 'mul']:
+                return idx == 0
+            if opcode[1] in ['je', 'jne', 'jl', 'jg']:
+                return idx == 2
+    return False
 
 
-def construct_ssa(scope):
-    queue = [min(scope['cfg'].keys())]
-    visited = set()
+def is_input(instruction, arg):
+    opcode = next(get_node_ast(instruction, 'opcode'))
+    arg_list = next(get_node_ast(instruction, 'arg_list'))
+    for idx, a in enumerate(get_node_ast(arg_list, 'arg')):
+        if arg == a:
+            if opcode[1] in ['mov', 'add', 'and', 'mul']:
+                return idx > 0
+            if opcode[1] in ['je', 'jne', 'jl', 'jg']:
+                return idx == 0 or idx == 1
+    return False
 
-    scope['ssa_form'] = {}
-    scope['ssa_form_def'] = {}
-    scope['ssa_form_def_'] = {}
-    scope['_ssa_reg_counter'] = {}
-    ssa_visitor = SSAVistor()
 
-    while queue:
-        curr = queue.pop(0)
-        if curr not in visited:
-            ssa_visitor.visit(scope['id_instruction'][curr], scope)
-            nxt = scope['cfg'][curr]
-            queue += nxt
-            visited.add(curr)
+def construct_ssa(cfg):
+    '''
+    Builds ssa form from CFG
+    :param cfg: control flow graph
+    :return: ssa form
+    '''
+    ssa_form = {}
+    ssa_form_def = {}
+    ssa_form_def_ = {}
+    _ssa_reg_counter = {}
+
+    for instruction in get_node_cfg(cfg):
+        for arg in get_node_ast(instruction, 'arg'):
+            opcode = next(get_node_ast(instruction, 'opcode'))
+            if is_output(instruction, arg):
+                if opcode[1] not in ['je', 'jne', 'jl', 'jg']:
+                    reg = next(get_node_ast(arg, 'reg'), [])
+                    if reg:
+                        if reg[1] not in _ssa_reg_counter:
+                            _ssa_reg_counter[reg[1]] = 0
+                        ssa_form_def[(reg, _ssa_reg_counter[reg[1]] + 1)] = instruction
+                        ssa_form_def_[(reg[1], _ssa_reg_counter[reg[1]] + 1)] = instruction
+
+            if is_input(instruction, arg):
+                reg = next(get_node_ast(arg, 'reg'), [])
+                const = next(get_node_ast(arg, 'number'), [])
+                if reg:
+                    if reg[1] not in _ssa_reg_counter:
+                        _ssa_reg_counter[reg[1]] = 0
+                    ssa_form[(reg, _ssa_reg_counter[reg[1]])] = instruction
+                if const:
+                    if const[1] not in _ssa_reg_counter:
+                        _ssa_reg_counter[const[1]] = 0
+                    ssa_form[(const, _ssa_reg_counter[const[1]])] = instruction
+
+            if is_output(instruction, arg):
+                reg = next(get_node_ast(arg, 'reg'), [])
+                if opcode[1] not in ['je', 'jne', 'jl', 'jg']:
+                    _ssa_reg_counter[reg[1]] += 1
+
+    return ssa_form, ssa_form_def, ssa_form_def_

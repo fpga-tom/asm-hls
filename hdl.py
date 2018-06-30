@@ -1,37 +1,34 @@
 import networkx as nx
+from gen import get_node_ast, get_node_cfg
 
 
-def find_raw(scope):
+def find_raw(ssa_form, ssa_form_def_):
     raw = {}
-    for reg, instruction in scope['ssa_form'].iteritems():
-        (reg_name, ssa_id) = reg
+    for (reg_name, ssa_id), instruction in ssa_form.items():
         if ssa_id > 0:
-            def_instruction = scope['ssa_form_def_'][(reg[0][1], reg[1])] # get ssa definition instruction
-            if instruction[-1] not in raw:
+            def_instruction = ssa_form_def_[(reg_name[1], ssa_id)] # get ssa definition instruction
+            if instruction not in raw:
                 raw[instruction[-1]] = []
             raw[instruction[-1]] += [def_instruction[-1]]
-    scope['raw'] = raw
+    return raw
 
 
-def asap(scope):
+def asap(cfg, raw):
     control_step = {}
-    queue = [min(scope['cfg'].keys())]
-    visited = set()
 
-    while queue:
-        curr = queue.pop(0)
-        if curr not in visited:
-            if scope['id_instruction'][curr][1][1] not in ['jmp']:
-                if curr not in scope['raw']:
-                    control_step[curr] = [0]
+    for instruction in get_node_cfg(cfg):
+        opcode = next(get_node_ast(instruction, 'opcode'))
+        if opcode[1] not in ['jmp']:
+            if instruction[-1] not in raw:
+                control_step[instruction[-1]] = [0]
+            else:
+                cs = [max(control_step[x][0] for x in raw[instruction[-1]]) + 1]
+                if instruction[-1] not in control_step:
+                    control_step[instruction[-1]] = cs
                 else:
-                    control_step[curr] = [max(control_step[x][0] for x in scope['raw'][curr]) + 1]
+                    control_step[instruction[-1]] += cs
 
-            nxt = scope['cfg'][curr]
-            queue += nxt
-            visited.add(curr)
-
-    scope['asap'] = control_step
+    return control_step
 
 
 def clique(scope):
@@ -51,7 +48,7 @@ def _cover(cliques):
     cli_complement = nx.complement(nx.from_dict_of_lists(cliques))
     coloring = nx.coloring.greedy_color(cli_complement)
     result = {}
-    for key, val in coloring.iteritems():
+    for key, val in coloring.items():
         if val not in result:
             result[val] = []
         result[val] += [key]
@@ -68,12 +65,12 @@ def reg_asap(scope):
     schedule = scope['asap']
     reg_schedule = {}
 
-    for reg, instruction in scope['ssa_form'].iteritems():
+    for reg, instruction in scope['ssa_form'].items():
         if reg[0][1] not in reg_schedule:
             reg_schedule[reg[0][1]] = []
         reg_schedule[reg[0][1]] += schedule[instruction[-1]]
 
-    for reg, instruction in scope['ssa_form_def'].iteritems():
+    for reg, instruction in scope['ssa_form_def'].items():
         if reg[0][1] not in reg_schedule:
             reg_schedule[reg[0][1]] = []
         reg_schedule[reg[0][1]] += schedule[instruction[-1]]
@@ -108,15 +105,15 @@ def signals(scope):
     sig = {}
     result = {}
     cover = scope['cover']
-    cover_reverse = {vv:k for k, v in cover.iteritems() for vv in v}
+    cover_reverse = {vv:k for k, v in cover.items() for vv in v}
     reg_cover = scope['reg_cover']
-    reg_cover_reverse = {vv: k for k, v in reg_cover.iteritems() for vv in v}
+    reg_cover_reverse = {vv: k for k, v in reg_cover.items() for vv in v}
 
-    for reg_ssa, instruction in scope['ssa_form'].iteritems():
+    for reg_ssa, instruction in scope['ssa_form'].items():
         (reg, ssa) = reg_ssa
         sig[(reg[-1], instruction[-1])] = scope['asap'][instruction[-1]]
 
-    for id_reg_id_instruction, control_step in sig.iteritems():
+    for id_reg_id_instruction, control_step in sig.items():
         (id_reg, id_instruction) = id_reg_id_instruction
         id_funit = cover_reverse[id_instruction]
         reg_name = scope['id_reg'][id_reg][1]
@@ -130,11 +127,11 @@ def signals(scope):
 
     sig = {}
     result = {}
-    for reg_ssa, instruction in scope['ssa_form_def'].iteritems():
+    for reg_ssa, instruction in scope['ssa_form_def'].items():
         (reg, ssa) = reg_ssa
         sig[(instruction[-1], reg[-1])] = scope['asap'][instruction[-1]]
 
-    for id_instruction_id_reg, control_step in sig.iteritems():
+    for id_instruction_id_reg, control_step in sig.items():
         (id_instruction, id_reg) = id_instruction_id_reg
         id_funit = cover_reverse[id_instruction]
         reg_name = scope['id_reg'][id_reg][1]
@@ -147,7 +144,7 @@ def signals(scope):
 
 
 def muxes(scope):
-    keys = scope['signals_in'].keys()
+    keys = list(scope['signals_in'].keys())
     mux = {}
     for i, j in enumerate(keys):
         for k in keys[i+1:]:
@@ -159,7 +156,7 @@ def muxes(scope):
 
     scope['muxes_in'] = mux
 
-    keys = scope['signals_out'].keys()
+    keys = list(scope['signals_out'].keys())
     mux = {}
     for i, j in enumerate(keys):
         for k in keys[i+1:]:
@@ -174,7 +171,7 @@ def muxes(scope):
 
 def fsm(scope):
     status_signals = {}
-    for mux, sig in scope['muxes_in'].iteritems():
+    for mux, sig in scope['muxes_in'].items():
         for i, s in enumerate(sig):
             control_steps = scope['signals_in'][s]
             for control_step in control_steps:
@@ -184,7 +181,7 @@ def fsm(scope):
                     status_signals[control_step][mux] = {}
                 status_signals[control_step][mux] = i
 
-    for mux, sig in scope['muxes_out'].iteritems():
+    for mux, sig in scope['muxes_out'].items():
         for i, s in enumerate(sig):
             control_steps = scope['signals_out'][s]
             for control_step in control_steps:
@@ -206,7 +203,7 @@ def is_fun(scope, id_fun, opcode):
     return instruction[1][1] == opcode
 
 def is_mux(mux, k):
-    for m, v in mux.iteritems():
+    for m, v in mux.items():
         if k in v:
             return True
     return False
@@ -226,7 +223,7 @@ def generate_opcode(scope, opcode):
         fi = "_".join(map(str, f))
         if 'fun_' + str(f[1]) not in result:
             result['fun_' + str(f[1])] = {}
-        if not is_mux(scope['muxes_in'], k):
+        if not is_mux(scope['muxes_in'], f):
             result['fun_' + str(f[1])]['in' + str(f[2])] = 'reg_out_' + str(f[0])
         else:
             result['fun_' + str(f[1])]['in' + str(f[2])] = 'mux_out_' + str(f[1]) + '_' + str(f[2])
@@ -236,7 +233,7 @@ def generate_opcode(scope, opcode):
 def generate_mux(scope):
     result = {}
     mux_out = scope['muxes_out']
-    for mux, r in mux_out.iteritems():
+    for mux, r in mux_out.items():
         fi = str(mux)
         for i, fun in enumerate(r):
             if 'mux_' + fi not in result:
@@ -245,7 +242,7 @@ def generate_mux(scope):
         result['mux_' + fi]['out'] = 'mux_out_' + fi
 
     mux_in = scope['muxes_in']
-    for mux, r in mux_in.iteritems():
+    for mux, r in mux_in.items():
         fi = '_'.join(map(str, mux))
         for i, reg in enumerate(r):
             if 'mux_' + fi not in result:
@@ -257,10 +254,10 @@ def generate_mux(scope):
 
 def generate_reg(scope):
     result = {}
-    for r, v in scope['reg_cover'].iteritems():
+    for r, v in scope['reg_cover'].items():
         result['reg_' + str(r)] = {'out': 'reg_out_' + str(r)}
 
-    for k, v in scope['signals_out'].iteritems():
+    for k, v in scope['signals_out'].items():
         if not is_mux(scope['muxes_out'], k):
             result['reg_' + str(k[1])]['in'] = 'fun_out_' + str(k[0])
         else:
@@ -269,8 +266,8 @@ def generate_reg(scope):
 
 def generate_fsm(scope):
     result = {}
-    for control_step, signals in scope['fsm'].iteritems():
-        sigs = {'mux_' + '_'.join(map(str, k if isinstance(k, tuple) else [k])): v for k, v in signals.iteritems()}
+    for control_step, signals in scope['fsm'].items():
+        sigs = {'mux_' + '_'.join(map(str, k if isinstance(k, tuple) else [k])): v for k, v in signals.items()}
         result[control_step] = {
             'state': control_step,
             'next_state': (control_step + 1) % (max(x[0] for x in scope['asap'].values()) + 1),
@@ -298,13 +295,14 @@ def generate_verilog(scope):
     _add = generate_opcode(scope, 'add')
     _mul = generate_opcode(scope, 'mul')
     _mov = generate_opcode(scope, 'mov')
+    _jl = generate_opcode(scope, 'jl')
     _mux =generate_mux(scope)
-    scope['all_signals'] |= set([ v['out'] for k, v in _reg.iteritems()])
-    scope['all_signals'] |= set([ v['out'] for k, v in _add.iteritems()])
-    scope['all_signals'] |= set([ v['out'] for k, v in _mul.iteritems()])
-    scope['all_signals'] |= set([ v['out'] for k, v in _mov.iteritems()])
-    scope['all_signals'] |= set([ v['out'] for k, v in _mux.iteritems()])
-    scope['all_signals'] |= set([ k  for k, v in _mux.iteritems()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _reg.items()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _add.items()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _mul.items()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _mov.items()])
+    scope['all_signals'] |= set([ v['out'] for k, v in _mux.items()])
+    scope['all_signals'] |= set([ k  for k, v in _mux.items()])
     output_top = template_top.render({
         'regs' : generate_reg(scope),
         'add': generate_opcode(scope, 'add'),

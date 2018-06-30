@@ -15,7 +15,7 @@ wire {{ bit_range }} {{ asig }};
 reg {{ bit_range }} {{ reg }};
 {% endfor %}
 
-{% for reg, port in regs.iteritems() %}
+{% for reg, port in regs.items() %}
 always @(posedge clk)
 begin
 	if (~reset)
@@ -27,29 +27,20 @@ begin
 end
 {% endfor %}
 
-{% for fun, add in add.iteritems() %}
-always @(posedge clk)
-begin
-	{{ add['out'] }} <= {{ add['in1'] }} + {{ add['in2'] }};
-end
+{% for fun, add in add.items() %}
+assign {{ add['out'] }} <= {{ add['in1'] }} + {{ add['in2'] }};
 {% endfor %}
 
-{% for fun, mul in mul.iteritems() %}
-always @(posedge clk)
-begin
-	{{ mul['out'] }} <= {{ mul['in1'] }} * {{ mul['in2'] }};
-end
+{% for fun, mul in mul.items() %}
+assign {{ mul['out'] }} <= {{ mul['in1'] }} * {{ mul['in2'] }};
 {% endfor %}
 
-{% for fun, mov in mov.iteritems() %}
-always @(posedge clk)
-begin
-	{{ mov['out'] }} <= {{ mov['in1'] }};
-end
+{% for fun, mov in mov.items() %}
+assign {{ mov['out'] }} <= {{ mov['in1'] }};
 {% endfor %}
 
 
-{% for fun, m in mux.iteritems() %}
+{% for fun, m in mux.items() %}
 always @(posedge clk)
 begin
     case( {{ fun }} )
@@ -67,10 +58,10 @@ begin
 		state <= 0;
 	else begin
 		case( state )
-		{% for k, v in fsm.iteritems() %}
+		{% for k, v in fsm.items() %}
 			{{ k }}:
 			begin
-			    {% for sig, val in fsm[k]['signals'].iteritems() %}
+			    {% for sig, val in fsm[k]['signals'].items() %}
 				{{ sig }} <= {{ val }};
 			    {% endfor %}
 				state <= {{ v['next_state'] }};
